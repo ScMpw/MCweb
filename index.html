@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monte Carlo Simulation</title>
+
+  <!-- React + Babel for JSX support -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+  <!-- Tailwind for styling -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+</head>
+<body class="bg-gray-100 p-6">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    function MonteCarloSimulation() {
+      const [epicName, setEpicName] = useState("");
+      const [originalEstimate, setOriginalEstimate] = useState("");
+      const [sprintValues, setSprintValues] = useState(Array(6).fill(""));
+      const [simulationResults, setSimulationResults] = useState(null);
+      const [textOutput, setTextOutput] = useState("");
+
+      const handleSprintChange = (index, value) => {
+        const newValues = [...sprintValues];
+        newValues[index] = value;
+        setSprintValues(newValues);
+      };
+
+      const runSimulation = () => {
+        const sortedSprints = sprintValues.map(Number).sort((a, b) => a - b);
+        const worstCaseValues = sortedSprints.slice(0, 2);
+        const bestCaseValues = sortedSprints.slice(-2);
+        const mixedCaseValues = sprintValues.map(Number);
+
+        const simulate = (caseValues) => {
+          let results = [];
+          for (let i = 0; i < 10000; i++) {
+            let totalCompleted = 0;
+            let sprints = 0;
+            while (totalCompleted < originalEstimate) {
+              totalCompleted += caseValues[Math.floor(Math.random() * caseValues.length)];
+              sprints++;
+            }
+            results.push(sprints);
+          }
+          return results;
+        };
+
+        const worstCaseResults = simulate(worstCaseValues);
+        const mixedCaseResults = simulate(mixedCaseValues);
+        const bestCaseResults = simulate(bestCaseValues);
+
+        const percentile95 = (results) => results.sort((a, b) => a - b)[Math.floor(0.95 * results.length)];
+
+        setSimulationResults({
+          worstCase: worstCaseResults,
+          mixedCase: mixedCaseResults,
+          bestCase: bestCaseResults,
+        });
+
+        setTextOutput(`Simulation Input Data:
+Worst Case: ${worstCaseValues}
+Mixed Case: ${mixedCaseValues}
+Best Case: ${bestCaseValues}
+
+Simulation Results (95th percentile):
+Worst Case: ${percentile95(worstCaseResults)} sprints
+Mixed Case: ${percentile95(mixedCaseResults)} sprints
+Best Case: ${percentile95(bestCaseResults)} sprints`);
+      };
+
+      return (
+        <div className="max-w-2xl mx-auto p-6 bg-white shadow rounded">
+          <h2 className="text-xl font-bold">Monte Carlo Simulation</h2>
+          <input
+            className="border p-2 w-full mt-2"
+            placeholder="Epic Name"
+            value={epicName}
+            onChange={(e) => setEpicName(e.target.value)}
+          />
+          <input
+            className="border p-2 w-full mt-2"
+            type="number"
+            placeholder="Original Estimate"
+            value={originalEstimate}
+            onChange={(e) => setOriginalEstimate(e.target.value)}
+          />
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            {sprintValues.map((val, i) => (
+              <input
+                key={i}
+                className="border p-2"
+                type="number"
+                placeholder={`Sprint ${i + 1}`}
+                value={val}
+                onChange={(e) => handleSprintChange(i, e.target.value)}
+              />
+            ))}
+          </div>
+          <button
+            className="bg-blue-500 text-white p-2 mt-4 w-full rounded"
+            onClick={runSimulation}
+          >
+            Run Simulation
+          </button>
+
+          {simulationResults && (
+            <div className="mt-6">
+              <h3 className="text-lg font-bold">Simulation Results</h3>
+              <pre className="bg-gray-200 p-4 rounded">{textOutput}</pre>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.render(<MonteCarloSimulation />, document.getElementById("root"));
+  </script>
+</body>
+</html>

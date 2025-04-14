@@ -53,13 +53,21 @@
 
         const getPercentile = (arr, p) => arr[Math.floor(p * arr.length)];
 
+        const p75 = getPercentile(mixedResult, 0.75);
         const p90 = getPercentile(mixedResult, 0.90);
         const p95 = getPercentile(mixedResult, 0.95);
+        const max = mixedResult[mixedResult.length - 1];
 
         const output = `Epic: ${epicName}
 PI: ${piName}
 Sprint Values: ${sprintNumbers.join(", ")}
-\nBest Case (<90%): < ${p90} sprints\nRealistic Case (90%-95%): ${p90}-${p95} sprints\nWorst Case (>95%): > ${p95} sprints`;
+
+Based on 10,000 simulations:
+
+With 75% certainty, you can expect to complete this epic within ${p75} sprints (Optimistic Scenario).
+With 95% certainty, you can expect to complete this epic within ${p95} sprints (Expected Scenario).
+If you want to be more than 95% certain of completion, plan for more than ${p95} sprints (Pessimistic Scenario, up to a maximum of ${max} sprints).`;
+
         setTextOutput(output);
 
         const buildPercentileData = (data) => {

@@ -2,22 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Monte Carlo Simulation</title>
-
-  <!-- React + Babel for JSX support -->
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
-
-  <!-- Tailwind for styling -->
+  <script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-100 p-6">
   <div id="root"></div>
-
   <script type="text/babel">
     const { useState } = React;
+    const { BarChart, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, Bar } = Recharts;
 
     function MonteCarloSimulation() {
       const [epicName, setEpicName] = useState("");
@@ -30,6 +27,17 @@
         const newValues = [...sprintValues];
         newValues[index] = value;
         setSprintValues(newValues);
+      };
+
+      const getHistogramData = (results) => {
+        const counts = {};
+        results.forEach(val => {
+          counts[val] = (counts[val] || 0) + 1;
+        });
+        return Object.entries(counts).map(([sprint, count]) => ({
+          sprint: Number(sprint),
+          count
+        })).sort((a, b) => a.sprint - b.sprint);
       };
 
       const runSimulation = () => {
@@ -64,56 +72,60 @@
           bestCase: bestCaseResults,
         });
 
-        setTextOutput(`Simulation Input Data:
-Worst Case: ${worstCaseValues}
-Mixed Case: ${mixedCaseValues}
-Best Case: ${bestCaseValues}
-
-Simulation Results (95th percentile):
-Worst Case: ${percentile95(worstCaseResults)} sprints
-Mixed Case: ${percentile95(mixedCaseResults)} sprints
-Best Case: ${percentile95(bestCaseResults)} sprints`);
+        setTextOutput(`Simulation Input Data:\nWorst Case: ${worstCaseValues}\nMixed Case: ${mixedCaseValues}\nBest Case: ${bestCaseValues}\n\nSimulation Results:\nWorst Case: ${percentile95(worstCaseResults)} sprints\nMixed Case: ${percentile95(mixedCaseResults)} sprints\nBest Case: ${percentile95(bestCaseResults)} sprints`);
       };
 
       return (
-        <div className="max-w-2xl mx-auto p-6 bg-white shadow rounded">
+        <div className="max-w-4xl mx-auto p-6 bg-white shadow rounded">
           <h2 className="text-xl font-bold">Monte Carlo Simulation</h2>
-          <input
-            className="border p-2 w-full mt-2"
-            placeholder="Epic Name"
-            value={epicName}
-            onChange={(e) => setEpicName(e.target.value)}
-          />
-          <input
-            className="border p-2 w-full mt-2"
-            type="number"
-            placeholder="Original Estimate"
-            value={originalEstimate}
-            onChange={(e) => setOriginalEstimate(e.target.value)}
-          />
+          <input className="border p-2 w-full mt-2" placeholder="Epic Name" value={epicName} onChange={(e) => setEpicName(e.target.value)} />
+          <input className="border p-2 w-full mt-2" type="number" placeholder="Original Estimate" value={originalEstimate} onChange={(e) => setOriginalEstimate(e.target.value)} />
           <div className="grid grid-cols-2 gap-2 mt-2">
             {sprintValues.map((val, i) => (
-              <input
-                key={i}
-                className="border p-2"
-                type="number"
-                placeholder={`Sprint ${i + 1}`}
-                value={val}
-                onChange={(e) => handleSprintChange(i, e.target.value)}
-              />
+              <input key={i} className="border p-2" type="number" placeholder={`Sprint ${i + 1}`} value={val} onChange={(e) => handleSprintChange(i, e.target.value)} />
             ))}
           </div>
-          <button
-            className="bg-blue-500 text-white p-2 mt-4 w-full rounded"
-            onClick={runSimulation}
-          >
-            Run Simulation
-          </button>
+          <button className="bg-blue-500 text-white p-2 mt-4 w-full rounded" onClick={runSimulation}>Run Simulation</button>
 
           {simulationResults && (
             <div className="mt-6">
               <h3 className="text-lg font-bold">Simulation Results</h3>
               <pre className="bg-gray-200 p-4 rounded">{textOutput}</pre>
+
+              <div className="mt-6">
+                <h3 className="text-lg font-bold">Worst Case Histogram</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={getHistogramData(simulationResults.worstCase)}>
+                    <XAxis dataKey="sprint" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="count" fill="#f87171" />
+                  </BarChart>
+                </ResponsiveContainer>
+
+                <h3 className="text-lg font-bold mt-6">Mixed Case Histogram</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={getHistogramData(simulationResults.mixedCase)}>
+                    <XAxis dataKey="sprint" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="count" fill="#60a5fa" />
+                  </BarChart>
+                </ResponsiveContainer>
+
+                <h3 className="text-lg font-bold mt-6">Best Case Histogram</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={getHistogramData(simulationResults.bestCase)}>
+                    <XAxis dataKey="sprint" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="count" fill="#34d399" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           )}
         </div>

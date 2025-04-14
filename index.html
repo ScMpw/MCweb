@@ -55,9 +55,11 @@
 
         const p90 = getPercentile(mixedResult, 0.90);
         const p95 = getPercentile(mixedResult, 0.95);
-        const pMedian = getPercentile(mixedResult, 0.5);
 
-        const output = `Epic: ${epicName}\nPI: ${piName}\nSprint Values: ${sprintNumbers.join(", ")}\n\nBest Case (<90%): ${p90} sprints\nRealistic Case (90%-95%): ${p95} sprints\nMost Likely (Median): ${pMedian} sprints`;
+        const output = `Epic: ${epicName}
+PI: ${piName}
+Sprint Values: ${sprintNumbers.join(", ")}
+\nBest Case (<90%): < ${p90} sprints\nRealistic Case (90%-95%): ${p90}-${p95} sprints\nWorst Case (>95%): > ${p95} sprints`;
         setTextOutput(output);
 
         const buildPercentileData = (data) => {

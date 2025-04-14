@@ -7,52 +7,44 @@
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
-  <script src="https://unpkg.com/recharts/umd/Recharts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
 </head>
 <body class="bg-gray-100 p-6">
   <div id="root"></div>
   <script type="text/babel">
-    const { useState } = React;
-    const { BarChart, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, Bar } = Recharts;
+    const { useState, useEffect, useRef } = React;
 
     function MonteCarloSimulation() {
-      const [epicName, setEpicName] = useState("");
       const [originalEstimate, setOriginalEstimate] = useState("");
       const [sprintValues, setSprintValues] = useState(Array(6).fill(""));
-      const [simulationResults, setSimulationResults] = useState(null);
       const [textOutput, setTextOutput] = useState("");
-
-      const handleSprintChange = (index, value) => {
-        const newValues = [...sprintValues];
-        newValues[index] = value;
-        setSprintValues(newValues);
-      };
-
-      const getHistogramData = (results) => {
-        const counts = {};
-        results.forEach(val => {
-          counts[val] = (counts[val] || 0) + 1;
-        });
-        return Object.entries(counts).map(([sprint, count]) => ({
-          sprint: Number(sprint),
-          count
-        })).sort((a, b) => a.sprint - b.sprint);
+      const chartRefs = {
+        worst: useRef(null),
+        mixed: useRef(null),
+        best: useRef(null)
       };
 
       const runSimulation = () => {
-        const sortedSprints = sprintValues.map(Number).sort((a, b) => a - b);
-        const worstCaseValues = sortedSprints.slice(0, 2);
-        const bestCaseValues = sortedSprints.slice(-2);
-        const mixedCaseValues = sprintValues.map(Number);
+        const sprintNumbers = sprintValues.map(Number).filter(n => !isNaN(n));
+        const estimate = Number(originalEstimate);
 
-        const simulate = (caseValues) => {
-          let results = [];
+        if (sprintNumbers.length < 6 || isNaN(estimate) || estimate <= 0) {
+          alert("Please fill in all sprint values and original estimate.");
+          return;
+        }
+
+        const sorted = [...sprintNumbers].sort((a, b) => a - b);
+        const worst = sorted.slice(0, 2);
+        const best = sorted.slice(-2);
+        const mixed = sprintNumbers;
+
+        const simulate = (velocities) => {
+          const results = [];
           for (let i = 0; i < 10000; i++) {
-            let totalCompleted = 0;
-            let sprints = 0;
-            while (totalCompleted < originalEstimate) {
-              totalCompleted += caseValues[Math.floor(Math.random() * caseValues.length)];
+            let total = 0, sprints = 0;
+            while (total < estimate) {
+              total += velocities[Math.floor(Math.random() * velocities.length)];
               sprints++;
             }
             results.push(sprints);
@@ -60,74 +52,79 @@
           return results;
         };
 
-        const worstCaseResults = simulate(worstCaseValues);
-        const mixedCaseResults = simulate(mixedCaseValues);
-        const bestCaseResults = simulate(bestCaseValues);
+        const buildHistogram = (data) => {
+          const counts = {};
+          data.forEach(n => counts[n] = (counts[n] || 0) + 1);
+          const labels = Object.keys(counts).sort((a, b) => a - b);
+          const values = labels.map(l => counts[l]);
+          return { labels, values };
+        };
 
-        const percentile95 = (results) => results.sort((a, b) => a - b)[Math.floor(0.95 * results.length)];
+        const renderChart = (ctx, label, histData, color) => {
+          new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: histData.labels,
+              datasets: [{
+                label,
+                data: histData.values,
+                backgroundColor: color,
+              }]
+            },
+            options: {
+              responsive: true,
+              scales: {
+                x: { title: { display: true, text: 'Sprints to Complete' } },
+                y: { title: { display: true, text: 'Frequency' } }
+              }
+            }
+          });
+        };
 
-        setSimulationResults({
-          worstCase: worstCaseResults,
-          mixedCase: mixedCaseResults,
-          bestCase: bestCaseResults,
+        // Run simulations
+        const worstResult = simulate(worst);
+        const mixedResult = simulate(mixed);
+        const bestResult = simulate(best);
+
+        // Text summary
+        const p95 = arr => arr.sort((a, b) => a - b)[Math.floor(0.95 * arr.length)];
+        setTextOutput(`Worst (95%): ${p95(worstResult)}\nMixed (95%): ${p95(mixedResult)}\nBest (95%): ${p95(bestResult)}`);
+
+        // Clear previous charts
+        ["worst", "mixed", "best"].forEach(k => {
+          if (chartRefs[k].current && chartRefs[k].current.chart) {
+            chartRefs[k].current.chart.destroy();
+          }
         });
 
-        setTextOutput(`Simulation Input Data:\nWorst Case: ${worstCaseValues}\nMixed Case: ${mixedCaseValues}\nBest Case: ${bestCaseValues}\n\nSimulation Results:\nWorst Case: ${percentile95(worstCaseResults)} sprints\nMixed Case: ${percentile95(mixedCaseResults)} sprints\nBest Case: ${percentile95(bestCaseResults)} sprints`);
+        // Draw charts
+        renderChart(chartRefs.worst.current.getContext('2d'), 'Worst Case', buildHistogram(worstResult), '#ef4444');
+        renderChart(chartRefs.mixed.current.getContext('2d'), 'Mixed Case', buildHistogram(mixedResult), '#3b82f6');
+        renderChart(chartRefs.best.current.getContext('2d'), 'Best Case', buildHistogram(bestResult), '#10b981');
       };
 
       return (
-        <div className="max-w-4xl mx-auto p-6 bg-white shadow rounded">
-          <h2 className="text-xl font-bold">Monte Carlo Simulation</h2>
-          <input className="border p-2 w-full mt-2" placeholder="Epic Name" value={epicName} onChange={(e) => setEpicName(e.target.value)} />
-          <input className="border p-2 w-full mt-2" type="number" placeholder="Original Estimate" value={originalEstimate} onChange={(e) => setOriginalEstimate(e.target.value)} />
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            {sprintValues.map((val, i) => (
-              <input key={i} className="border p-2" type="number" placeholder={`Sprint ${i + 1}`} value={val} onChange={(e) => handleSprintChange(i, e.target.value)} />
+        <div className="max-w-4xl mx-auto bg-white p-6 rounded shadow">
+          <h1 className="text-2xl font-bold mb-4">Monte Carlo Simulation</h1>
+          <input className="border p-2 w-full mb-2" placeholder="Original Estimate" type="number" value={originalEstimate} onChange={e => setOriginalEstimate(e.target.value)} />
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {sprintValues.map((val, idx) => (
+              <input key={idx} className="border p-2" placeholder={`Sprint ${idx + 1}`} type="number" value={val} onChange={e => {
+                const newVals = [...sprintValues];
+                newVals[idx] = e.target.value;
+                setSprintValues(newVals);
+              }} />
             ))}
           </div>
-          <button className="bg-blue-500 text-white p-2 mt-4 w-full rounded" onClick={runSimulation}>Run Simulation</button>
-
-          {simulationResults && (
-            <div className="mt-6">
-              <h3 className="text-lg font-bold">Simulation Results</h3>
-              <pre className="bg-gray-200 p-4 rounded">{textOutput}</pre>
-
-              <div className="mt-6">
-                <h3 className="text-lg font-bold">Worst Case Histogram</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={getHistogramData(simulationResults.worstCase)}>
-                    <XAxis dataKey="sprint" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="count" fill="#f87171" />
-                  </BarChart>
-                </ResponsiveContainer>
-
-                <h3 className="text-lg font-bold mt-6">Mixed Case Histogram</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={getHistogramData(simulationResults.mixedCase)}>
-                    <XAxis dataKey="sprint" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="count" fill="#60a5fa" />
-                  </BarChart>
-                </ResponsiveContainer>
-
-                <h3 className="text-lg font-bold mt-6">Best Case Histogram</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={getHistogramData(simulationResults.bestCase)}>
-                    <XAxis dataKey="sprint" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="count" fill="#34d399" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+          <button className="bg-blue-500 text-white px-4 py-2 rounded w-full" onClick={runSimulation}>Run Simulation</button>
+          {textOutput && (
+            <pre className="mt-4 p-4 bg-gray-100 rounded whitespace-pre-wrap">{textOutput}</pre>
           )}
+          <div className="mt-6 space-y-8">
+            <canvas ref={chartRefs.worst} className="w-full h-64"></canvas>
+            <canvas ref={chartRefs.mixed} className="w-full h-64"></canvas>
+            <canvas ref={chartRefs.best} className="w-full h-64"></canvas>
+          </div>
         </div>
       );
     }

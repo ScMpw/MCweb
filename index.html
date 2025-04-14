@@ -24,9 +24,7 @@
       const [sprintValues, setSprintValues] = useState(Array(6).fill(""));
       const [textOutput, setTextOutput] = useState("");
       const chartRefs = {
-        worst: useRef(null),
-        mixed: useRef(null),
-        best: useRef(null)
+        mixed: useRef(null)
       };
 
       const runSimulation = () => {
@@ -37,11 +35,6 @@
           alert("Please fill in all sprint values and original estimate.");
           return;
         }
-
-        const sorted = [...sprintNumbers].sort((a, b) => a - b);
-        const worst = sorted.slice(0, 2);
-        const best = sorted.slice(-2);
-        const mixed = sprintNumbers;
 
         const simulate = (velocities) => {
           const results = [];
@@ -55,6 +48,17 @@
           }
           return results.sort((a, b) => a - b);
         };
+
+        const mixedResult = simulate(sprintNumbers);
+
+        const getPercentile = (arr, p) => arr[Math.floor(p * arr.length)];
+
+        const p90 = getPercentile(mixedResult, 0.90);
+        const p95 = getPercentile(mixedResult, 0.95);
+        const pMedian = getPercentile(mixedResult, 0.5);
+
+        const output = `Epic: ${epicName}\nPI: ${piName}\nSprint Values: ${sprintNumbers.join(", ")}\n\nBest Case (<90%): ${p90} sprints\nRealistic Case (90%-95%): ${p95} sprints\nMost Likely (Median): ${pMedian} sprints`;
+        setTextOutput(output);
 
         const buildPercentileData = (data) => {
           const labels = [];
@@ -97,18 +101,7 @@
           });
         };
 
-        const worstResult = simulate(worst);
-        const mixedResult = simulate(mixed);
-        const bestResult = simulate(best);
-
-        const p95 = arr => arr[Math.floor(0.95 * arr.length)];
-        const inputData = `Sprint Values: ${sprintNumbers.join(", ")}`;
-        const output = `Epic: ${epicName}\nPI: ${piName}\n${inputData}\n\nWorst (95%): ${p95(worstResult)}\nMixed (95%): ${p95(mixedResult)}\nBest (95%): ${p95(bestResult)}`;
-        setTextOutput(output);
-
-        renderChart(chartRefs.worst.current.getContext('2d'), 'Worst Case', buildPercentileData(worstResult), '#ef4444');
-        renderChart(chartRefs.mixed.current.getContext('2d'), 'Mixed Case', buildPercentileData(mixedResult), '#3b82f6');
-        renderChart(chartRefs.best.current.getContext('2d'), 'Best Case', buildPercentileData(bestResult), '#10b981');
+        renderChart(chartRefs.mixed.current.getContext('2d'), 'Mixed Case (All Velocities)', buildPercentileData(mixedResult), '#3b82f6');
       };
 
       const downloadPDF = () => {
@@ -117,16 +110,8 @@
         const lines = doc.splitTextToSize(textOutput, 180);
         doc.text(lines, 10, 10);
 
-        const addChartToPDF = (ref, yPos, label) => {
-          const imgData = ref.current.toDataURL("image/png");
-          doc.text(label, 10, yPos - 5);
-          doc.addImage(imgData, 'PNG', 10, yPos, 180, 60);
-        };
-
-        addChartToPDF(chartRefs.worst, 60, 'Worst Case');
-        addChartToPDF(chartRefs.mixed, 130, 'Mixed Case');
-        addChartToPDF(chartRefs.best, 200, 'Best Case');
-
+        const imgData = chartRefs.mixed.current.toDataURL("image/png");
+        doc.addImage(imgData, 'PNG', 10, 70, 180, 80);
         doc.save(`${epicName}_${piName}_simulation_results.pdf`);
       };
 
@@ -150,10 +135,8 @@
           {textOutput && (
             <pre className="mt-4 p-4 bg-gray-100 rounded whitespace-pre-wrap">{textOutput}</pre>
           )}
-          <div className="mt-6 space-y-8">
-            <canvas ref={chartRefs.worst} className="w-full h-64"></canvas>
+          <div className="mt-6">
             <canvas ref={chartRefs.mixed} className="w-full h-64"></canvas>
-            <canvas ref={chartRefs.best} className="w-full h-64"></canvas>
           </div>
         </div>
       );
